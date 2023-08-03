@@ -3,8 +3,24 @@ from app import *
 from flask_restful import Resource
 from flask_apispec.views import MethodResource
 from flask_apispec import marshal_with, doc, use_kwargs
-from app.schemas import (QuestionMasterSchema, CreateQuizSchema, UserMasterSchema, AssignQuizSchema, UserResponseSchema, LoginSchema, APIResponseSchema, ViewQuizSchema, ViewResponseSchema)
-from app.services import uuid, session, add_user, add_session, add_question, list_questions, add_quiz, assign_quiz, view_quiz, list_assigned_quizzes, list_quizzes, attempt_quiz, all_quiz_result
+from app.schemas import (QuestionMasterSchema, CreateQuizSchema, UserMasterSchema, AssignQuizSchema, UserResponseSchema, LoginSchema, UnifiedAPIResponseSchema, ViewQuizSchema, UnifiedViewResponseSchema)
+from app.services import session, add_user, add_session, add_question, list_questions, add_quiz, assign_quiz, view_quiz, list_assigned_quizzes, list_quizzes, attempt_quiz, all_quiz_result
+
+
+def _view_generator(status, _response, *messages):
+    if status == 1:
+        if type(_response) == type(1):
+            if _response == 1:
+                return UnifiedAPIResponseSchema().dump(dict(message=messages[0])), 200
+            else:
+                return UnifiedAPIResponseSchema().dump(dict(message=messages[1])), 404
+        elif type(_response) == type([]):
+            return UnifiedViewResponseSchema().dump(dict(response=_response)), 200
+        else:
+            return UnifiedAPIResponseSchema().dump(dict(message=messages[0])), 200
+    else:
+        raise Exception(status)
+
 
 """
 [Sign Up API] : Its responsibility is to perform the signup activity for the user.
@@ -13,16 +29,14 @@ from app.services import uuid, session, add_user, add_session, add_question, lis
 class SignUpAPI(MethodResource, Resource):
     @doc(description="Sign Up API", tags=["RIO APIs"])
     @use_kwargs(UserMasterSchema, location=('json'))
-    @marshal_with(APIResponseSchema)
+    @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
         try:
             status, _response = add_user(**kwargs)
-            if status == 1:
-                return APIResponseSchema().dump(dict(message=f"User {kwargs['username']} has created successfully")), 200
-            else:
-                raise Exception(status)
+            message_success=f"User {kwargs['username']} is created successfully"
+            return _view_generator(status, _response, message_success)
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while creating USER, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while creating USER, error:{str(e)}")), 500
             
 
 api.add_resource(SignUpAPI, '/signup')
@@ -35,20 +49,18 @@ create session id which will be used for all subsequent operations.
 class LoginAPI(MethodResource, Resource):
     @doc(descrition="Login API", tags=["RIO APIs"])
     @use_kwargs(LoginSchema, location=('json'))
-    @marshal_with(APIResponseSchema)
+    @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
         try:
             user = UserMaster.query.filter_by(username=kwargs['username'], password=kwargs['password']).first()
             if user:
-                status, _response = add_session(user)
-                if status == 1:
-                    return APIResponseSchema().dump(dict(message=f"User {kwargs['username']} has logged in successfully")), 200
-                else:
-                    raise Exception(status)
+                status, _response = add_session(user=user)
+                message=f"User {kwargs['username']} is logged in successfully"
+                return _view_generator(status, _response, message)
             else:
-                return APIResponseSchema().dump(dict(message=f"User {kwargs['username']} does not exist")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message=f"User {kwargs['username']} does not exist")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while logging USER, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while logging USER, error:{str(e)}")), 500
         
 
 api.add_resource(LoginAPI, '/login')
@@ -59,7 +71,7 @@ docs.register(LoginAPI)
 """
 class LogoutAPI(MethodResource, Resource):
    @doc(description="Logout API", tags=["RIO APIs"])
-   @marshal_with(APIResponseSchema)
+   @marshal_with(UnifiedAPIResponseSchema)
    def get(self):
         try:
             if session.get('user_id') and session.get('session_id'):
@@ -69,9 +81,9 @@ class LogoutAPI(MethodResource, Resource):
                 user_session.is_active = 0
                 db.session.commit()
             session.clear()
-            return APIResponseSchema().dump(dict(message="User has logged out successfully")), 200
+            return UnifiedAPIResponseSchema().dump(dict(message="User has logged out successfully")), 200
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while logging out USER, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while logging out USER, error:{str(e)}")), 500
             
 
 api.add_resource(LogoutAPI, '/logout')
@@ -84,19 +96,17 @@ Admin has only the rights to perform this activity.
 class AddQuestionAPI(MethodResource, Resource):
     @doc(description="Add Question API", tags=["Questions"])
     @use_kwargs(QuestionMasterSchema, location=('json'))
-    @marshal_with(APIResponseSchema)
+    @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
                 status, _response = add_question(**kwargs)
-                if status == 1:
-                    return APIResponseSchema().dump(dict(message=f"Question {kwargs['question']} has created successfully")), 200
-                else:
-                    raise Exception(status)
+                message=f"Question {kwargs['question']} has created successfully"
+                return _view_generator(status, _response, message)
             else:
-                return APIResponseSchema().dump(dict(message="Only Admin can add the questions")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can add the questions")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while creating QUESTION, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while creating QUESTION, error:{str(e)}")), 500
 
 
 api.add_resource(AddQuestionAPI, '/add.question')
@@ -112,14 +122,11 @@ class ListQuestionAPI(MethodResource, Resource):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
                 status, question_list = list_questions()
-                if status == 1:
-                    return ViewResponseSchema().dump(dict(response=question_list)), 200
-                else:
-                    raise Exception(status)
+                return _view_generator(status, question_list, "Questions are listed successfully")
             else:
-                return APIResponseSchema().dump(dict(message="Only Admin can access all the questions")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can access all the questions")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while listing questions, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while listing questions, error:{str(e)}")), 500
 
 
 api.add_resource(ListQuestionAPI, '/list.questions')
@@ -131,19 +138,17 @@ docs.register(ListQuestionAPI)
 class CreateQuizAPI(MethodResource, Resource):
     @doc(description="Create Quiz API", tags=["Quiz"])
     @use_kwargs(CreateQuizSchema, location=('json'))
-    @marshal_with(APIResponseSchema)
+    @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
                 status, _response = add_quiz(**kwargs)
-                if status == 1:
-                    return APIResponseSchema().dump(dict(message=f"Quiz {kwargs['name']} has created successfully")), 200
-                else:
-                    raise Exception(status)
+                message = f"Quiz {kwargs['name']} has created successfully"
+                return _view_generator(status, _response, message)
             else:
-                return APIResponseSchema().dump(dict(message="Only Admin can create the quiz")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can create the quiz")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while creating quiz, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while creating quiz, error:{str(e)}")), 500
 
 
 api.add_resource(CreateQuizAPI, '/create.quiz')
@@ -155,21 +160,18 @@ docs.register(CreateQuizAPI)
 class AssignQuizAPI(MethodResource, Resource):
     @doc(description="Assign Quiz API", tags=["Quiz"])
     @use_kwargs(AssignQuizSchema, location=('json'))
-    @marshal_with(APIResponseSchema)
+    @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
                 status, _response = assign_quiz(**kwargs)
-                if (status == 1) and (_response == 1):
-                    return APIResponseSchema().dump(dict(message="Quiz has been assigned respectively to the Users")), 200
-                elif (status == 1) and (_response == 0):
-                    return APIResponseSchema().dump(dict(message="Quiz does not exist Please check the quiz id")), 404
-                else:
-                    raise Exception(status)
+                message_success="Quiz has been assigned respectively to the Users"
+                message_not_exist="Quiz does not exist Please check the quiz id"
+                return _view_generator(status, _response, message_success, message_not_exist)
             else:
-                return APIResponseSchema().dump(dict(message="Only Admin can assign the quiz")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can assign the quiz")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while assigning quiz, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while assigning quiz, error:{str(e)}")), 500
 
 
 api.add_resource(AssignQuizAPI, '/assign.quiz')
@@ -186,16 +188,13 @@ class ViewQuizAPI(MethodResource, Resource):
         try:
             if session.get('user_id'):
                 status, _response = view_quiz(**kwargs) #  returns quiz_questions_list
-                if (status == 1) and (_response != 0):
-                    return ViewResponseSchema().dump(dict(response=_response)), 200
-                elif (status == 1) and (_response == 0):
-                    return APIResponseSchema().dump(dict(message="Quiz does not exist or you are not assigned to this quiz")), 404
-                else:
-                    raise Exception(status)
+                message_success = "Quiz has been viewed successfully"
+                message_not_exist="Quiz does not exist or you are not assigned to this quiz"
+                return _view_generator(status, _response, message_success, message_not_exist)
             else:
-                return APIResponseSchema().dump(dict(message="Login to view the quiz details")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Login to view the quiz details")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while viewing quiz, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while viewing quiz, error:{str(e)}")), 500
 
 
 api.add_resource(ViewQuizAPI, '/view.quiz')
@@ -207,19 +206,16 @@ docs.register(ViewQuizAPI)
 """
 class ViewAssignedQuizAPI(MethodResource, Resource):
     @doc(description="View Assigned Quiz API", tags=["Quiz"])
-    # @marshal_with(APIResponseSchema)
+    # @marshal_with(UnifiedAPIResponseSchema)
     def post(self):
         try:
             if session.get('user_id'):
-                status, _response = list_assigned_quizzes() #  returns quiz_instance_list
-                if status == 1:
-                    return ViewResponseSchema().dump(dict(response=_response)), 200
-                else:
-                    raise Exception(status)
+                status, quiz_instance_list = list_assigned_quizzes() #  returns quiz_instance_list
+                return _view_generator(status, quiz_instance_list, "Assigned quizzes are listed successfully")
             else:
-                return APIResponseSchema().dump(dict(message="Login to view the assigned quizzes")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Login to view the assigned quizzes")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while viewing assigned quizzes, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while viewing assigned quizzes, error:{str(e)}")), 500
 
 
 api.add_resource(ViewAssignedQuizAPI, '/assigned.quizzes')
@@ -231,19 +227,16 @@ docs.register(ViewAssignedQuizAPI)
 """
 class ViewAllQuizAPI(MethodResource, Resource):
     @doc(description="View All Quiz API", tags=["Quiz"])
-    # @marshal_with(APIResponseSchema)
+    # @marshal_with(UnifiedAPIResponseSchema)
     def post(self):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
-                status, _response = list_quizzes()
-                if status == 1:
-                    return ViewResponseSchema().dump(dict(response=_response)), 200
-                else:
-                    raise Exception(status)
+                status, quizzes_list = list_quizzes()
+                return _view_generator(status, quizzes_list, "Quizzes are listed successfully")
             else:
-                return APIResponseSchema().dump(dict(message="Only Admin can view the quiz")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can view the quiz")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while viewing quiz, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while viewing quiz, error:{str(e)}")), 500
 
 
 api.add_resource(ViewAllQuizAPI, '/all.quizzes')
@@ -256,21 +249,18 @@ docs.register(ViewAllQuizAPI)
 class AttemptQuizAPI(MethodResource, Resource):
     @doc(description="Attempt Quiz API", tags=["Quiz"])
     @use_kwargs(UserResponseSchema, location=("json"))
-    @marshal_with(APIResponseSchema)
+    @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
         try:
             if session.get('user_id'):
                 status, _response = attempt_quiz(**kwargs)
-                if (status == 1) and (_response == 0):
-                    return APIResponseSchema().dump(dict(message="Quiz is not assigned to you or does not exist")), 404
-                elif (status == 1) and (_response != 0):
-                    return APIResponseSchema().dump(dict(message=f"score achieved: {_response.score_achieved}")), 200
-                else:
-                    raise Exception(status)
+                message_success=f"score achieved: {_response.score_achieved}"
+                message_not_exist="Quiz is not assigned to you or does not exist"
+                return _view_generator(status, _response, message_success, message_not_exist)
             else:
-                return APIResponseSchema().dump(dict(message="Only Users can attempt the quiz")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Only Users can attempt the quiz")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while attempting quiz, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while attempting quiz, error:{str(e)}")), 500
 
 
 api.add_resource(AttemptQuizAPI, '/attempt.quiz')
@@ -288,14 +278,11 @@ class QuizResultAPI(MethodResource, Resource):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
                 status, _response = all_quiz_result()
-                if status == 1:
-                    return ViewResponseSchema().dump(dict(response=_response)), 200
-                else:
-                    raise Exception(status)
+                return _view_generator(status, _response, "Quiz results are listed successfully")
             else:
-                return APIResponseSchema().dump(dict(message="Only Admin can view the quiz")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can view the quiz")), 404
         except Exception as e:
-            return APIResponseSchema().dump(dict(message=f"error while viewing quiz, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while viewing quiz, error:{str(e)}")), 500
 
 
 api.add_resource(QuizResultAPI, '/quiz.results')

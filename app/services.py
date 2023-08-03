@@ -12,9 +12,9 @@ from typing import List
 """
 
 def exception_handler(func):
-    def wrapper():
+    def wrapper(**kwargs):
         try:
-            data = func()
+            data = func(**kwargs)
             return 1, data
         except Exception as e:
             return e
@@ -34,7 +34,8 @@ def add_user(**kwargs):
     return 1
     
 @exception_handler    
-def add_session(user):
+def add_session(**kwargs):
+    user = kwargs['user']
     user_session = UserSession(
                     id = str(uuid.uuid4()),
                     user_id = user.id,

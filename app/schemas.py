@@ -41,8 +41,8 @@ class LoginSchema(Schema):
     username = fields.String(required=True)
     password = fields.String(required=True)
 
-class APIResponseSchema(Schema):
+class UnifiedAPIResponseSchema(Schema):
     message = fields.String(default="default responce message")
 
-class ViewResponseSchema(Schema):
+class UnifiedViewResponseSchema(Schema):
     response = fields.List(fields.Dict(keys=fields.String(), values=fields.String()))

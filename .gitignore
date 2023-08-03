@@ -161,3 +161,6 @@ cython_debug/
 
 # vscode config files and folders
 .vscode
+
+# mysql eer stuff
+QuizPortal_EER.mwb.bak
