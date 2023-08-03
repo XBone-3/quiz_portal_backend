@@ -11,8 +11,6 @@ if __name__ == "__main__":
     with application.app_context():
         try:
             add_questions()
-            # add_users()
-            # add_quizzes()
         except Exception as e:
             print(f'{e} main file')
         
