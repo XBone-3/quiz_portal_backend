@@ -1,5 +1,5 @@
 from sqlalchemy.orm.session import sessionmaker
-from app.models import QuestionMaster, QuizInstance, QuizMaster, QuizQuestions, UserMaster, UserResponses, UserSession
+from app.models import (QuestionMaster, QuizInstance, QuizMaster, QuizQuestions, UserMaster, UserResponses, UserSession)
 from app import db
 import uuid
 from flask import session
@@ -13,15 +13,41 @@ from typing import List
 
 def exception_handler(func):
     def wrapper(**kwargs):
+        """
+        A function that serves as a wrapper for another function.
+
+        Args:
+            **kwargs: Keyword arguments that will be passed to the wrapped function.
+
+        Returns:
+            tuple: A tuple containing an integer status code and the result of the wrapped function if successful.
+            Exception: An exception object if an error occurs during the execution of the wrapped function.
+        """
         try:
             data = func(**kwargs)
             return 1, data
-        except Exception as e:
-            return e
+        except Exception as dbe:
+            return dbe
     return wrapper
 
 @exception_handler
 def add_user(**kwargs):
+    """
+    Adds a new user to the database.
+
+    Parameters:
+        **kwargs (dict): A dictionary containing the user information.
+            - name (str): The name of the user.
+            - username (str): The username of the user.
+            - password (str): The password of the user.
+            - is_admin (bool): Indicates whether the user is an admin or not.
+
+    Returns:
+        int: The result of the operation. Returns 1 if the user was successfully added to the database.
+
+    Raises:
+        DatabaseError: If there was an error adding the user to the database.
+    """
     user = UserMaster(
             id=str(uuid.uuid4()),
             name=kwargs['name'],
@@ -35,6 +61,25 @@ def add_user(**kwargs):
     
 @exception_handler    
 def add_session(**kwargs):
+    """
+    Adds a session for the given user.
+
+    Args:
+        **kwargs (dict): Keyword arguments containing the user information.
+
+    Returns:
+        int: Returns 1 on success.
+
+    Raises:
+        Exception: If there is an error while adding the session.
+
+    Notes:
+        - This function adds a session for the user.
+        - The user information is passed as keyword arguments.
+        - The session ID and user ID are stored in the session object.
+        - The user's `is_active` flag is set to 1.
+        - The changes are committed to the database.
+    """
     user = kwargs['user']
     user_session = UserSession(
                     id = str(uuid.uuid4()),
@@ -51,6 +96,23 @@ def add_session(**kwargs):
 
 @exception_handler
 def add_question(**kwargs):
+    """
+    Adds a question to the database.
+
+    Parameters:
+        **kwargs (dict): Keyword arguments containing the question details.
+            - question (str): The question text.
+            - choice1 (str): The first choice for the question.
+            - choice2 (str): The second choice for the question.
+            - choice3 (str): The third choice for the question.
+            - choice4 (str): The fourth choice for the question.
+            - answer (str): The correct answer for the question.
+            - marks (int): The marks assigned to the question.
+            - remarks (str): Any remarks for the question.
+
+    Returns:
+        int: The result of adding the question to the database. Returns 1 on success.
+    """
     question = QuestionMaster(
                     id=str(uuid.uuid4()),
                     question=kwargs['question'],
@@ -68,6 +130,14 @@ def add_question(**kwargs):
 
 @exception_handler
 def list_questions():
+    """
+    Retrieve a list of questions from the QuestionMaster table.
+
+    Returns:
+        List: A list of dictionaries containing the question details. Each dictionary
+        contains the following keys: 'id', 'question', 'choice1', 'choice2',
+        'choice3', 'choice4', 'answer'.
+    """
     questions = QuestionMaster.query.all()
     question_list = List()
     for question in questions:
@@ -85,6 +155,17 @@ def list_questions():
 
 @exception_handler
 def add_quiz(**kwargs):
+    """
+    Adds a quiz to the database.
+
+    Args:
+        **kwargs: A dictionary containing the following keys:
+            - name (str): The name of the quiz.
+            - question_ids (List[str]): A list of question ids associated with the quiz.
+
+    Returns:
+        int: The status code indicating the success of the operation. Returns 1 if the quiz was successfully added to the database.
+    """
     quiz = QuizMaster(
                     id=str(uuid.uuid4()),
                     quiz_name=kwargs['name'],   
@@ -102,6 +183,15 @@ def add_quiz(**kwargs):
 
 @exception_handler
 def assign_quiz(**kwargs):
+    """
+    Assigns a quiz to one or more users.
+
+    Args:
+        **kwargs (dict): A dictionary containing the quiz ID as the key and a list of user IDs as the value.
+
+    Returns:
+        int: Returns 1 if the quiz is successfully assigned to all users, otherwise returns 0.
+    """
     for quiz_id, user_ids in kwargs['instance'].items():
         quiz = QuizMaster.query.filter_by(id=quiz_id).first()
         if quiz:
@@ -120,6 +210,26 @@ def assign_quiz(**kwargs):
 
 @exception_handler
 def view_quiz(**kwargs):
+    """
+    View a quiz and retrieve the list of questions for the quiz.
+
+    Parameters:
+        **kwargs (dict): Arbitrary keyword arguments. The 'quiz_id' key is required.
+
+    Returns:
+        list: A list of dictionaries representing the quiz questions. Each dictionary contains the following keys:
+            - 'quiz_name' (str): The name of the quiz.
+            - 'question_id' (int): The ID of the question.
+            - 'question' (str): The text of the question.
+            - 'choice1' (str): The first choice for the question.
+            - 'choice2' (str): The second choice for the question.
+            - 'choice3' (str): The third choice for the question.
+            - 'choice4' (str): The fourth choice for the question.
+            - 'marks' (int): The marks assigned to the question.
+            - 'remarks' (str): Remarks or additional information about the question.
+
+        int: 0 if the user is not authorized to view the quiz.
+    """
     quiz = QuizMaster.query.filter_by(id=kwargs['quiz_id']).first()
     quiz_question_ids = [quiz_question.question_id for quiz_question in QuizQuestions.query.filter_by(quiz_id=quiz.id).all()]
     quiz_questions = [QuestionMaster.query.filter_by(id=question_id).first() for question_id in quiz_question_ids]
@@ -146,6 +256,18 @@ def view_quiz(**kwargs):
     
 @exception_handler
 def list_assigned_quizzes():
+    """
+    Retrieves a list of assigned quizzes for the current user.
+
+    Returns:
+        List: A list of dictionaries containing information about each assigned quiz.
+            Each dictionary has the following keys:
+            - 'quiz_name' (str): The name of the assigned quiz.
+            - 'quiz_id' (int): The ID of the assigned quiz.
+            - 'user_id' (int): The ID of the user the quiz is assigned to.
+            - 'score_achieved' (float): The score achieved by the user for the quiz.
+            - 'is_submitted' (bool): Indicates whether the quiz has been submitted by the user.
+    """
     quiz_instances = QuizInstance.query.filter_by(user_id=session['user_id']).all()
     quiz_instance_list = List()
     for quiz_instance in quiz_instances:
@@ -161,6 +283,17 @@ def list_assigned_quizzes():
 
 @exception_handler
 def list_quizzes():
+    """
+    Function that lists all the quizzes.
+    
+    Returns:
+        list: A list of dictionaries containing the details of each quiz. Each dictionary has the following keys:
+            - id (int): The unique identifier of the quiz.
+            - quiz_name (str): The name of the quiz.
+            - is_active (bool): Indicates whether the quiz is active or not.
+            - created_at (datetime): The timestamp when the quiz was created.
+            - updated_at (datetime): The timestamp when the quiz was last updated.
+    """
     quizzes = QuizMaster.query.all()
     quiz_list = list()
     for quiz in quizzes:
@@ -176,6 +309,17 @@ def list_quizzes():
 
 @exception_handler
 def attempt_quiz(**kwargs):
+    """
+    Attempt a quiz and save the user's responses.
+
+    Args:
+        **kwargs (dict): Keyword arguments containing the quiz ID and user's responses.
+
+    Returns:
+        QuizInstance: The updated QuizInstance object.
+
+        Int: 0 if the user is not authorized to attempt the quiz.
+    """
     quiz = QuizMaster.query.filter_by(id=kwargs['quiz_id']).first()
     quiz_instance = QuizInstance.query.filter_by(quiz_id=quiz.id).first()
     if quiz_instance.user_id == session['user_id']:
@@ -202,6 +346,18 @@ def attempt_quiz(**kwargs):
 
 @exception_handler
 def all_quiz_result():
+    """
+    Retrieves all quiz results from the database.
+
+    Returns:
+        list: A list of dictionaries containing detailed information about each quiz instance.
+              Each dictionary contains the following keys:
+              - id (int): The ID of the quiz instance.
+              - quiz_id (int): The ID of the quiz associated with the instance.
+              - user_id (int): The ID of the user who took the quiz.
+              - score_achieved (int): The score achieved by the user in the quiz.
+              - is_submitted (bool): Indicates whether the quiz was submitted by the user.
+    """
     quiz_instances = QuizInstance.query.all()
     detailed_quiz_instance_list = list()
     for quiz_instance in quiz_instances:

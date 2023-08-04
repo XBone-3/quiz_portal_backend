@@ -8,6 +8,29 @@ from app.services import session, add_user, add_session, add_question, list_ques
 
 
 def _view_generator(status, _response, *messages):
+    """
+    Generate the response based on the status and response data.
+
+    Args:
+        status (int): The status of the response.
+        _response (int or list): The response data.
+        *messages (str): The optional messages to include in the response.
+
+    Returns:
+        tuple: A tuple containing the serialized response data and the HTTP status code.
+
+    Raises:
+        Exception: If the status is not 1.
+
+    Note:
+        - If the status is 1:
+            - If the response is an integer:
+                - If the response is 1, the message at index 0 will be included in the response.
+                - If the response is not 1, the message at index 1 will be included in the response.
+            - If the response is a list, the response will be serialized using UnifiedViewResponseSchema.
+        - If the status is not 1, an exception will be raised with the given status.
+
+    """
     if status == 1:
         if type(_response) == type(1):
             if _response == 1:
@@ -72,7 +95,7 @@ docs.register(LoginAPI)
 class LogoutAPI(MethodResource, Resource):
    @doc(description="Logout API", tags=["RIO APIs"])
    @marshal_with(UnifiedAPIResponseSchema)
-   def get(self):
+   def post(self):
         try:
             if session.get('user_id') and session.get('session_id'):
                 user = UserMaster.query.filter_by(id=session['user_id']).first()
@@ -121,8 +144,8 @@ class ListQuestionAPI(MethodResource, Resource):
     def post(self):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
-                status, question_list = list_questions()
-                return _view_generator(status, question_list, "Questions are listed successfully")
+                status, _response = list_questions() # return list of questions
+                return _view_generator(status, _response, "Questions are listed successfully")
             else:
                 return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can access all the questions")), 404
         except Exception as e:
@@ -187,7 +210,7 @@ class ViewQuizAPI(MethodResource, Resource):
     def post(self, **kwargs):
         try:
             if session.get('user_id'):
-                status, _response = view_quiz(**kwargs) #  returns quiz_questions_list
+                status, _response = view_quiz(**kwargs) #  returns list of questions for the quiz
                 message_success = "Quiz has been viewed successfully"
                 message_not_exist="Quiz does not exist or you are not assigned to this quiz"
                 return _view_generator(status, _response, message_success, message_not_exist)
@@ -210,8 +233,8 @@ class ViewAssignedQuizAPI(MethodResource, Resource):
     def post(self):
         try:
             if session.get('user_id'):
-                status, quiz_instance_list = list_assigned_quizzes() #  returns quiz_instance_list
-                return _view_generator(status, quiz_instance_list, "Assigned quizzes are listed successfully")
+                status, _response = list_assigned_quizzes() #  returns list of quiz_instances assigned to user
+                return _view_generator(status, _response, "Assigned quizzes are listed successfully")
             else:
                 return UnifiedAPIResponseSchema().dump(dict(message="Login to view the assigned quizzes")), 404
         except Exception as e:
@@ -231,8 +254,8 @@ class ViewAllQuizAPI(MethodResource, Resource):
     def post(self):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
-                status, quizzes_list = list_quizzes()
-                return _view_generator(status, quizzes_list, "Quizzes are listed successfully")
+                status, _response = list_quizzes() # return list of quizzes
+                return _view_generator(status, _response, "Quizzes are listed successfully")
             else:
                 return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can view the quiz")), 404
         except Exception as e:
@@ -253,7 +276,7 @@ class AttemptQuizAPI(MethodResource, Resource):
     def post(self, **kwargs):
         try:
             if session.get('user_id'):
-                status, _response = attempt_quiz(**kwargs)
+                status, _response = attempt_quiz(**kwargs) # return attempted quiz score
                 message_success=f"score achieved: {_response.score_achieved}"
                 message_not_exist="Quiz is not assigned to you or does not exist"
                 return _view_generator(status, _response, message_success, message_not_exist)
@@ -277,7 +300,7 @@ class QuizResultAPI(MethodResource, Resource):
     def post(self):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
-                status, _response = all_quiz_result()
+                status, _response = all_quiz_result() #  returns list of all quizzes with details
                 return _view_generator(status, _response, "Quiz results are listed successfully")
             else:
                 return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can view the quiz")), 404
