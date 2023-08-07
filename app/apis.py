@@ -117,7 +117,10 @@ docs.register(LogoutAPI)
 Admin has only the rights to perform this activity.
 """
 class AddQuestionAPI(MethodResource, Resource):
-    @doc(description="Add Question API", tags=["Questions"])
+    @doc(description="""
+         [Add Question API] : Its responsibility is to add question to the question bank.
+         Admin has only the rights to perform this activity.
+         """, tags=["Questions"])
     @use_kwargs(QuestionMasterSchema, location=('json'))
     @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
@@ -140,7 +143,10 @@ docs.register(AddQuestionAPI)
 Here only Admin can access all the questions.
 """
 class ListQuestionAPI(MethodResource, Resource):
-    @doc(description="List Question API", tags=["Questions"])
+    @doc(description="""
+         [List Questions API] : Its responsibility is to list all questions present activly in the question bank.
+         only Admin can access all the questions.
+         """, tags=["Questions"])
     def post(self):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
@@ -159,14 +165,22 @@ docs.register(ListQuestionAPI)
 [Create Quiz API] : Its responsibility is to create quiz and only admin can create quiz using this API.
 """
 class CreateQuizAPI(MethodResource, Resource):
-    @doc(description="Create Quiz API", tags=["Quiz"])
+    @doc(description="""
+         [Create Quiz API] : Its responsibility is to create quiz and only admin can create quiz using this API.
+         [Input Format] :   {
+                                "question_ids": [
+                                    "id1", "id2", "id3"...
+                                ],
+                                "quiz_name": "name of the quiz"
+                            }
+         """, tags=["Quiz"])
     @use_kwargs(CreateQuizSchema, location=('json'))
     @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
                 status, _response = add_quiz(**kwargs)
-                message = f"Quiz {kwargs['name']} has created successfully"
+                message = f"Quiz {kwargs['quiz_name']} has created successfully"
                 return _view_generator(status, _response, message)
             else:
                 return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can create the quiz")), 404
@@ -181,7 +195,16 @@ docs.register(CreateQuizAPI)
 [Assign Quiz API] : Its responsibility is to assign quiz to the user. Only Admin can perform this API call.
 """
 class AssignQuizAPI(MethodResource, Resource):
-    @doc(description="Assign Quiz API", tags=["Quiz"])
+    @doc(description="""
+         [Assign Quiz API] : Its responsibility is to assign quiz to the user. Only Admin can perform this API call.
+         assign quiz to different users at a time.
+         [Input Format] :   {
+                                "quiz_id": "id of the quiz",
+                                "user_ids": [
+                                    "id1", "id2", "id3"...
+                                ]
+                            }
+         """, tags=["Quiz"])
     @use_kwargs(AssignQuizSchema, location=('json'))
     @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
@@ -205,7 +228,10 @@ docs.register(AssignQuizAPI)
 Only Admin and the assigned users to this quiz can access the quiz details.
 """
 class ViewQuizAPI(MethodResource, Resource):
-    @doc(description="View Quiz API", tags=["Quiz"])
+    @doc(description="""
+         [View Quiz API] : Its responsibility is to view the quiz details.
+         Only Admin and the assigned users to this quiz can access the quiz details.
+         """, tags=["Quiz"])
     @use_kwargs(ViewQuizSchema, location=('json'))
     def post(self, **kwargs):
         try:
@@ -228,8 +254,10 @@ docs.register(ViewQuizAPI)
                             with there submittion status and achieved scores.
 """
 class ViewAssignedQuizAPI(MethodResource, Resource):
-    @doc(description="View Assigned Quiz API", tags=["Quiz"])
-    # @marshal_with(UnifiedAPIResponseSchema)
+    @doc(description="""
+         [View Assigned Quiz API] : Its responsibility is to list all the assigned quizzes with their submittion status and achieved scores.
+         Takes no parameters.
+         """, tags=["Quiz"])
     def post(self):
         try:
             if session.get('user_id'):
@@ -249,7 +277,10 @@ docs.register(ViewAssignedQuizAPI)
 [View All Quiz API] : Its responsibility is to list all the created quizzes. Admin can only list all quizzes.
 """
 class ViewAllQuizAPI(MethodResource, Resource):
-    @doc(description="View All Quiz API", tags=["Quiz"])
+    @doc(description="""
+         [View All Quiz API] : Its responsibility is to list all the created quizzes.
+         Admin can only list all quizzes.
+         """, tags=["Quiz"])
     # @marshal_with(UnifiedAPIResponseSchema)
     def post(self):
         try:
@@ -270,14 +301,27 @@ docs.register(ViewAllQuizAPI)
                         the user and the score will be shown as a result of the submitted attempt.
 """
 class AttemptQuizAPI(MethodResource, Resource):
-    @doc(description="Attempt Quiz API", tags=["Quiz"])
+    @doc(description="""
+         [Attempt Quiz API] : Its responsibility is to perform quiz attempt activity by the user and the score will be shown as a result of the submitted attempt.
+         [Input Format] :   {
+                                "quiz_id": "id of attempting quiz",
+                                "responses": [
+                                    {
+                                        "question_id": "choice number",
+                                        "question_id": "choice number",
+                                        "question_id": "choice number",
+                                        ...
+                                    }
+                                ]
+                            }
+         """, tags=["Quiz"])
     @use_kwargs(UserResponseSchema, location=("json"))
     @marshal_with(UnifiedAPIResponseSchema)
     def post(self, **kwargs):
         try:
             if session.get('user_id'):
                 status, _response = attempt_quiz(**kwargs) # return attempted quiz score
-                message_success=f"score achieved: {_response.score_achieved}"
+                message_success=f"score achieved: {_response.score_achieved if _response != 0 else 0}"
                 message_not_exist="Quiz is not assigned to you or does not exist"
                 return _view_generator(status, _response, message_success, message_not_exist)
             else:
@@ -296,16 +340,20 @@ docs.register(AttemptQuizAPI)
                         Admin has only acess to this functionality.
 """
 class QuizResultAPI(MethodResource, Resource):
-    @doc(description="Quiz Results API", tags=["Quiz"])
+    @doc(description="""
+         [Quiz Results API] : Its responsibility is to provide the quiz results in which the users having the scores sorted in descending order are displayed.
+         Also the ones who have not attempted are also shown.
+         Admin has only acess to this functionality.
+         """, tags=["Quiz"])
     def post(self):
         try:
             if session.get('user_id') and (session['is_admin'] == 1):
                 status, _response = all_quiz_result() #  returns list of all quizzes with details
                 return _view_generator(status, _response, "Quiz results are listed successfully")
             else:
-                return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can view the quiz")), 404
+                return UnifiedAPIResponseSchema().dump(dict(message="Only Admin can view all quiz status")), 404
         except Exception as e:
-            return UnifiedAPIResponseSchema().dump(dict(message=f"error while viewing quiz, error:{str(e)}")), 500
+            return UnifiedAPIResponseSchema().dump(dict(message=f"error while viewing quiz status, error:{str(e)}")), 500
 
 
 api.add_resource(QuizResultAPI, '/quiz.results')

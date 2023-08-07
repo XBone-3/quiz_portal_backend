@@ -14,7 +14,7 @@ from typing import List
 def exception_handler(func):
     def wrapper(**kwargs):
         """
-        A function that serves as a wrapper for another function.
+        A function that serves as a wrapper function.
 
         Args:
             **kwargs: Keyword arguments that will be passed to the wrapped function.
@@ -66,6 +66,7 @@ def add_session(**kwargs):
 
     Args:
         **kwargs (dict): Keyword arguments containing the user information.
+            - user (UserMaster): The user to add the session for.
 
     Returns:
         int: Returns 1 on success.
@@ -139,7 +140,7 @@ def list_questions():
         'choice3', 'choice4', 'answer'.
     """
     questions = QuestionMaster.query.all()
-    question_list = List()
+    question_list = list()
     for question in questions:
         question = {
             'id': question.id,
@@ -168,7 +169,7 @@ def add_quiz(**kwargs):
     """
     quiz = QuizMaster(
                     id=str(uuid.uuid4()),
-                    quiz_name=kwargs['name'],   
+                    quiz_name=kwargs['quiz_name'],   
                 )
     for question_id in kwargs['question_ids']:
         quiz_question = QuizQuestions(
@@ -234,7 +235,6 @@ def view_quiz(**kwargs):
     quiz_question_ids = [quiz_question.question_id for quiz_question in QuizQuestions.query.filter_by(quiz_id=quiz.id).all()]
     quiz_questions = [QuestionMaster.query.filter_by(id=question_id).first() for question_id in quiz_question_ids]
     user_ids = [quiz_instance.user_id for quiz_instance in QuizInstance.query.filter_by(quiz_id=quiz.id).all()]
-    print(user_ids)
     if (session['user_id'] in user_ids) or (session['is_admin'] == 1):
         quiz_questions_list = list()
         for question in quiz_questions:
@@ -269,7 +269,7 @@ def list_assigned_quizzes():
             - 'is_submitted' (bool): Indicates whether the quiz has been submitted by the user.
     """
     quiz_instances = QuizInstance.query.filter_by(user_id=session['user_id']).all()
-    quiz_instance_list = List()
+    quiz_instance_list = list()
     for quiz_instance in quiz_instances:
         quiz_instance = {
             'quiz_name': QuizMaster.query.filter_by(id=quiz_instance.quiz_id).first().quiz_name,

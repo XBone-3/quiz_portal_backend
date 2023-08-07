@@ -31,6 +31,9 @@ from app.models import *
 
 def add_user():
     try:
+        users = UserMaster.query.all()
+        if users:
+            return
         users = [
             {
                 'id': str(i),
